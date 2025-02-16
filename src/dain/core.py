@@ -25,6 +25,22 @@ _lib.dain_matmul.argtypes = [
 ]
 _lib.dain_matmul.restype = ctypes.c_int
 
+_lib.dain_relu.argtypes = [
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    ctypes.c_int,
+]
+_lib.dain_relu.restype = ctypes.c_int
+
+
+_lib.dain_relu_grad.argtypes = [
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    ctypes.c_int,
+]
+_lib.dain_relu_grad.restype = ctypes.c_int
+
 
 def add(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     """Element-wise addition of two arrays.
@@ -95,3 +111,60 @@ def matmul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
         raise RuntimeError("Operation failed")
 
     return c
+
+
+def relu(x: np.ndarray) -> np.ndarray:
+    """Apply ReLU activation function element-wise.
+
+    Args:
+        x: Input array
+
+    Returns:
+        Array with ReLU activation applied (max(0, x))
+    """
+    if not isinstance(x, np.ndarray):
+        raise TypeError("Input must be a numpy array")
+
+    # Ensure contiguous array
+    if not x.flags["C_CONTIGUOUS"]:
+        x = np.ascontiguousarray(x)
+
+    x = x.astype(np.float32)
+    y = np.empty_like(x)
+
+    if _lib.dain_relu(x, y, x.size) != 0:
+        raise RuntimeError("Operation failed")
+
+    return y
+
+
+def relu_grad(x: np.ndarray, grad_in: np.ndarray) -> np.ndarray:
+    """Compute ReLU gradient.
+
+    Args:
+        x: Input array that was passed to ReLU
+        grad_in: Incoming gradient from upstream
+
+    Returns:
+        Gradient with respect to x
+    """
+    if not (isinstance(x, np.ndarray) and isinstance(grad_in, np.ndarray)):
+        raise TypeError("Inputs must be numpy arrays")
+
+    if x.shape != grad_in.shape:
+        raise ValueError("Arrays must have the same shape")
+
+    # Ensure contiguous arrays
+    if not x.flags["C_CONTIGUOUS"]:
+        x = np.ascontiguousarray(x)
+    if not grad_in.flags["C_CONTIGUOUS"]:
+        grad_in = np.ascontiguousarray(grad_in)
+
+    x = x.astype(np.float32)
+    grad_in = grad_in.astype(np.float32)
+    grad_out = np.empty_like(x)
+
+    if _lib.dain_relu_grad(x, grad_in, grad_out, x.size) != 0:
+        raise RuntimeError("Operation failed")
+
+    return grad_out
