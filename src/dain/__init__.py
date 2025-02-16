@@ -1,3 +1,3 @@
-from .core import add_one
+from .core import matmul
 
-__all__ = ["add_one"]
+__all__ = ["matmul"]
