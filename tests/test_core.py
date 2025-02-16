@@ -15,8 +15,8 @@ def test_add_basic():
 
 def test_add_broadcast_row():
     """Test broadcasting single row."""
-    a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)  # (2,2)
-    b = np.array([[10.0, 20.0]], dtype=np.float32)  # (1,2)
+    a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    b = np.array([[10.0, 20.0]], dtype=np.float32)
     result = add(a, b)
     expected = np.array([[11.0, 22.0], [13.0, 24.0]], dtype=np.float32)
     np.testing.assert_array_almost_equal(result, expected)
@@ -24,8 +24,8 @@ def test_add_broadcast_row():
 
 def test_add_broadcast_column():
     """Test broadcasting single column."""
-    a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)  # (2,2)
-    b = np.array([[10.0], [20.0]], dtype=np.float32)  # (2,1)
+    a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    b = np.array([[10.0], [20.0]], dtype=np.float32)
     result = add(a, b)
     expected = np.array([[11.0, 12.0], [23.0, 24.0]], dtype=np.float32)
     np.testing.assert_array_almost_equal(result, expected)
@@ -33,34 +33,25 @@ def test_add_broadcast_column():
 
 def test_add_non_broadcastable():
     """Test when shapes cannot be broadcast."""
-    a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)  # (2,2)
-    b = np.array([[1.0, 2.0, 3.0]], dtype=np.float32)  # (1,3)
-    with pytest.raises(ValueError, match="Cannot broadcast shapes"):
-        add(a, b)
-
-
-def test_add_2d():
-    """Test 2D array addition."""
     a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
-    b = np.array([[5.0, 6.0], [7.0, 8.0]], dtype=np.float32)
-    result = add(a, b)
-    expected = np.array([[6.0, 8.0], [10.0, 12.0]], dtype=np.float32)
-    np.testing.assert_array_almost_equal(result, expected)
-
-
-def test_add_not_2d():
-    """Test when input is not 2D."""
-    a = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)  # 2D
-    b = np.array([1.0, 2.0], dtype=np.float32)  # 1D
-    with pytest.raises(ValueError, match="Inputs must be 2D arrays"):
+    b = np.array([[1.0, 2.0, 3.0]], dtype=np.float32)
+    with pytest.raises(ValueError, match="Cannot broadcast shapes"):
         add(a, b)
 
 
 def test_add_non_array():
     """Test when inputs are not numpy arrays."""
-    a = [1.0, 2.0, 3.0]
-    b = np.array([4.0, 5.0, 6.0], dtype=np.float32)
+    a = [[1.0, 2.0, 3.0]]
+    b = np.array([[4.0, 5.0, 6.0]], dtype=np.float32)
     with pytest.raises(TypeError, match="Inputs must be numpy arrays"):
+        add(a, b)
+
+
+def test_add_non_2d():
+    """Test when inputs are not 2D arrays."""
+    a = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    b = np.array([[4.0, 5.0, 6.0]], dtype=np.float32)
+    with pytest.raises(ValueError, match="Inputs must be 2D arrays"):
         add(a, b)
 
 
