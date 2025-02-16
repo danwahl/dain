@@ -1,5 +1,7 @@
 import numpy as np
-from dain.core import add_one
+
+from dain import add_one
+
 
 def test_add_one():
     arr = np.array([1.0, 2.0, 3.0], dtype=np.float32)
