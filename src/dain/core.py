@@ -11,6 +11,9 @@ _lib.dain_add.argtypes = [
     np.ctypeslib.ndpointer(dtype=np.float32),
     np.ctypeslib.ndpointer(dtype=np.float32),
     ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
+    ctypes.c_int,
 ]
 _lib.dain_add.restype = ctypes.c_int
 
@@ -57,20 +60,26 @@ _lib.dain_relu_grad.restype = ctypes.c_int
 
 
 def add(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """Element-wise addition of two arrays.
+    """Element-wise addition with broadcasting support.
 
     Args:
         a: First input array
         b: Second input array
 
     Returns:
-        Array containing element-wise sum of inputs
+        Array containing element-wise sum with broadcasting
     """
     if not (isinstance(a, np.ndarray) and isinstance(b, np.ndarray)):
         raise TypeError("Inputs must be numpy arrays")
 
-    if a.shape != b.shape:
-        raise ValueError("Arrays must have the same shape")
+    if not (a.ndim == 2 and b.ndim == 2):
+        raise ValueError("Inputs must be 2D arrays")
+
+    a_rows, a_cols = a.shape
+    b_rows, b_cols = b.shape
+
+    if not ((b_rows == 1 or b_rows == a_rows) and (b_cols == 1 or b_cols == a_cols)):
+        raise ValueError(f"Cannot broadcast shapes {a.shape} and {b.shape}")
 
     if not a.flags["C_CONTIGUOUS"]:
         a = np.ascontiguousarray(a)
@@ -79,10 +88,9 @@ def add(a: np.ndarray, b: np.ndarray) -> np.ndarray:
 
     a = a.astype(np.float32)
     b = b.astype(np.float32)
-
     c = np.empty_like(a)
 
-    if _lib.dain_add(a, b, c, a.size) != 0:
+    if _lib.dain_add(a, b, c, a_rows, a_cols, b_rows, b_cols) != 0:
         raise RuntimeError("Operation failed")
 
     return c
@@ -136,6 +144,9 @@ def mse(pred: np.ndarray, target: np.ndarray) -> float:
     Returns:
         MSE loss value
     """
+    if not (isinstance(pred, np.ndarray) and isinstance(target, np.ndarray)):
+        raise TypeError("Inputs must be numpy arrays")
+
     if pred.shape != target.shape:
         raise ValueError("Arrays must have the same shape")
 
@@ -165,6 +176,9 @@ def mse_grad(pred: np.ndarray, target: np.ndarray) -> np.ndarray:
     Returns:
         Gradient of MSE with respect to predictions
     """
+    if not (isinstance(pred, np.ndarray) and isinstance(target, np.ndarray)):
+        raise TypeError("Inputs must be numpy arrays")
+
     if pred.shape != target.shape:
         raise ValueError("Arrays must have the same shape")
 

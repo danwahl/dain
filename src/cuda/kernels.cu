@@ -1,11 +1,32 @@
 #include "kernels.cuh"
 
-__global__ void add_kernel(float *a, float *b, float *c, int size)
+__global__ void add_kernel(const float *a, const float *b, float *c, int a_rows, int a_cols, int b_rows, int b_cols)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx < size)
+    int total_elements = a_rows * a_cols;
+
+    if (idx < total_elements)
     {
-        c[idx] = a[idx] + b[idx];
+        int row = idx / a_cols;
+        int col = idx % a_cols;
+
+        float a_val = a[idx];
+
+        float b_val;
+        if (b_rows == 1)
+        {
+            b_val = b[col];
+        }
+        else if (b_cols == 1)
+        {
+            b_val = b[row];
+        }
+        else
+        {
+            b_val = b[idx];
+        }
+
+        c[idx] = a_val + b_val;
     }
 }
 
@@ -83,40 +104,48 @@ __global__ void relu_grad_kernel(float *x, float *grad_in, float *grad_out, int 
     }
 }
 
-int dain_add(const float *h_a, const float *h_b, float *h_c, int size)
+int dain_add(const float *h_a, const float *h_b, float *h_c, int a_rows, int a_cols, int b_rows, int b_cols)
 {
+    if ((b_rows != 1 && b_rows != a_rows) ||
+        (b_cols != 1 && b_cols != a_cols))
+    {
+        return 1;
+    }
+
     float *d_a = nullptr, *d_b = nullptr, *d_c = nullptr;
 
-    cudaError_t ret = cudaMalloc(&d_a, size * sizeof(float));
+    cudaError_t ret = cudaMalloc(&d_a, a_rows * a_cols * sizeof(float));
     if (ret == cudaSuccess)
     {
-        ret = cudaMalloc(&d_b, size * sizeof(float));
+        ret = cudaMalloc(&d_b, b_rows * b_cols * sizeof(float));
     }
     if (ret == cudaSuccess)
     {
-        ret = cudaMalloc(&d_c, size * sizeof(float));
+        ret = cudaMalloc(&d_c, a_rows * a_cols * sizeof(float));
     }
 
     if (ret == cudaSuccess)
     {
-        ret = cudaMemcpy(d_a, h_a, size * sizeof(float), cudaMemcpyHostToDevice);
+        ret = cudaMemcpy(d_a, h_a, a_rows * a_cols * sizeof(float), cudaMemcpyHostToDevice);
     }
     if (ret == cudaSuccess)
     {
-        ret = cudaMemcpy(d_b, h_b, size * sizeof(float), cudaMemcpyHostToDevice);
+        ret = cudaMemcpy(d_b, h_b, b_rows * b_cols * sizeof(float), cudaMemcpyHostToDevice);
     }
 
     if (ret == cudaSuccess)
     {
         const int block_size = 256;
-        const int num_blocks = (size + block_size - 1) / block_size;
-        add_kernel<<<num_blocks, block_size>>>(d_a, d_b, d_c, size);
+        const int num_blocks = (a_rows * a_cols + block_size - 1) / block_size;
+        add_kernel<<<num_blocks, block_size>>>(d_a, d_b, d_c,
+                                               a_rows, a_cols,
+                                               b_rows, b_cols);
         ret = cudaGetLastError();
     }
 
     if (ret == cudaSuccess)
     {
-        ret = cudaMemcpy(h_c, d_c, size * sizeof(float), cudaMemcpyDeviceToHost);
+        ret = cudaMemcpy(h_c, d_c, a_rows * a_cols * sizeof(float), cudaMemcpyDeviceToHost);
     }
 
     cudaFree(d_a);
