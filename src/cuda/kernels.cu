@@ -25,6 +25,46 @@ __global__ void matmul_kernel(float *a, float *b, float *c, int m, int n, int k)
     }
 }
 
+__global__ void mse_kernel(float *pred, float *target, float *sum, int size)
+{
+    __shared__ float shared_sum[256];
+    int tid = threadIdx.x;
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+
+    float local_sum = 0.0f;
+    while (idx < size)
+    {
+        float diff = pred[idx] - target[idx];
+        local_sum += diff * diff;
+        idx += gridDim.x * blockDim.x;
+    }
+    shared_sum[tid] = local_sum;
+
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1)
+    {
+        if (tid < stride)
+        {
+            shared_sum[tid] += shared_sum[tid + stride];
+        }
+        __syncthreads();
+    }
+
+    if (tid == 0)
+    {
+        atomicAdd(sum, shared_sum[0]);
+    }
+}
+
+__global__ void mse_grad_kernel(float *pred, float *target, float *grad, int size)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if (idx < size)
+    {
+        grad[idx] = 2.0f * (pred[idx] - target[idx]) / size;
+    }
+}
+
 __global__ void relu_kernel(float *x, float *y, int size)
 {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
@@ -43,7 +83,7 @@ __global__ void relu_grad_kernel(float *x, float *grad_in, float *grad_out, int 
     }
 }
 
-int dain_add(float *h_a, float *h_b, float *h_c, int size)
+int dain_add(const float *h_a, const float *h_b, float *h_c, int size)
 {
     float *d_a = nullptr, *d_b = nullptr, *d_c = nullptr;
 
@@ -86,7 +126,7 @@ int dain_add(float *h_a, float *h_b, float *h_c, int size)
     return ret == cudaSuccess ? 0 : 1;
 }
 
-int dain_matmul(float *h_a, float *h_b, float *h_c, int m, int n, int k)
+int dain_matmul(const float *h_a, const float *h_b, float *h_c, int m, int n, int k)
 {
     float *d_a = nullptr, *d_b = nullptr, *d_c = nullptr;
 
@@ -131,7 +171,102 @@ int dain_matmul(float *h_a, float *h_b, float *h_c, int m, int n, int k)
     return ret == cudaSuccess ? 0 : 1;
 }
 
-int dain_relu(float *h_x, float *h_y, int size)
+int dain_mse(const float *h_pred, const float *h_target, float *h_loss, int size)
+{
+    float *d_pred = nullptr, *d_target = nullptr, *d_sum = nullptr;
+
+    cudaError_t ret = cudaMalloc(&d_pred, size * sizeof(float));
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMalloc(&d_target, size * sizeof(float));
+    }
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMalloc(&d_sum, sizeof(float));
+    }
+
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMemcpy(d_pred, h_pred, size * sizeof(float), cudaMemcpyHostToDevice);
+    }
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMemcpy(d_target, h_target, size * sizeof(float), cudaMemcpyHostToDevice);
+    }
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMemset(d_sum, 0, sizeof(float));
+    }
+
+    if (ret == cudaSuccess)
+    {
+        const int block_size = 256;
+        const int num_blocks = min(256, (size + block_size - 1) / block_size);
+        mse_kernel<<<num_blocks, block_size>>>(d_pred, d_target, d_sum, size);
+        ret = cudaGetLastError();
+    }
+
+    if (ret == cudaSuccess)
+    {
+        float sum;
+        ret = cudaMemcpy(&sum, d_sum, sizeof(float), cudaMemcpyDeviceToHost);
+        if (ret == cudaSuccess)
+        {
+            *h_loss = sum / size;
+        }
+    }
+
+    cudaFree(d_pred);
+    cudaFree(d_target);
+    cudaFree(d_sum);
+
+    return ret == cudaSuccess ? 0 : 1;
+}
+
+int dain_mse_grad(const float *h_pred, const float *h_target, float *h_grad, int size)
+{
+    float *d_pred = nullptr, *d_target = nullptr, *d_grad = nullptr;
+
+    cudaError_t ret = cudaMalloc(&d_pred, size * sizeof(float));
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMalloc(&d_target, size * sizeof(float));
+    }
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMalloc(&d_grad, size * sizeof(float));
+    }
+
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMemcpy(d_pred, h_pred, size * sizeof(float), cudaMemcpyHostToDevice);
+    }
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMemcpy(d_target, h_target, size * sizeof(float), cudaMemcpyHostToDevice);
+    }
+
+    if (ret == cudaSuccess)
+    {
+        const int block_size = 256;
+        const int num_blocks = (size + block_size - 1) / block_size;
+        mse_grad_kernel<<<num_blocks, block_size>>>(d_pred, d_target, d_grad, size);
+        ret = cudaGetLastError();
+    }
+
+    if (ret == cudaSuccess)
+    {
+        ret = cudaMemcpy(h_grad, d_grad, size * sizeof(float), cudaMemcpyDeviceToHost);
+    }
+
+    cudaFree(d_pred);
+    cudaFree(d_target);
+    cudaFree(d_grad);
+
+    return ret == cudaSuccess ? 0 : 1;
+}
+
+int dain_relu(const float *h_x, float *h_y, int size)
 {
     float *d_x = nullptr, *d_y = nullptr;
 
@@ -165,7 +300,7 @@ int dain_relu(float *h_x, float *h_y, int size)
     return ret == cudaSuccess ? 0 : 1;
 }
 
-int dain_relu_grad(float *x, float *h_grad_in, float *h_grad_out, int size)
+int dain_relu_grad(const float *x, const float *h_grad_in, float *h_grad_out, int size)
 {
     float *d_x = nullptr, *d_grad_in = nullptr, *d_grad_out = nullptr;
 

@@ -14,7 +14,6 @@ _lib.dain_add.argtypes = [
 ]
 _lib.dain_add.restype = ctypes.c_int
 
-
 _lib.dain_matmul.argtypes = [
     np.ctypeslib.ndpointer(dtype=np.float32),
     np.ctypeslib.ndpointer(dtype=np.float32),
@@ -25,13 +24,28 @@ _lib.dain_matmul.argtypes = [
 ]
 _lib.dain_matmul.restype = ctypes.c_int
 
+_lib.dain_mse.argtypes = [
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    ctypes.POINTER(ctypes.c_float),
+    ctypes.c_int,
+]
+_lib.dain_mse.restype = ctypes.c_int
+
+_lib.dain_mse_grad.argtypes = [
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    np.ctypeslib.ndpointer(dtype=np.float32),
+    ctypes.c_int,
+]
+_lib.dain_mse_grad.restype = ctypes.c_int
+
 _lib.dain_relu.argtypes = [
     np.ctypeslib.ndpointer(dtype=np.float32),
     np.ctypeslib.ndpointer(dtype=np.float32),
     ctypes.c_int,
 ]
 _lib.dain_relu.restype = ctypes.c_int
-
 
 _lib.dain_relu_grad.argtypes = [
     np.ctypeslib.ndpointer(dtype=np.float32),
@@ -58,7 +72,6 @@ def add(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     if a.shape != b.shape:
         raise ValueError("Arrays must have the same shape")
 
-    # Ensure contiguous arrays
     if not a.flags["C_CONTIGUOUS"]:
         a = np.ascontiguousarray(a)
     if not b.flags["C_CONTIGUOUS"]:
@@ -113,6 +126,63 @@ def matmul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
     return c
 
 
+def mse(pred: np.ndarray, target: np.ndarray) -> float:
+    """Compute Mean Squared Error loss.
+
+    Args:
+        pred: Predicted values
+        target: Target values
+
+    Returns:
+        MSE loss value
+    """
+    if pred.shape != target.shape:
+        raise ValueError("Arrays must have the same shape")
+
+    if not pred.flags["C_CONTIGUOUS"]:
+        pred = np.ascontiguousarray(pred)
+    if not target.flags["C_CONTIGUOUS"]:
+        target = np.ascontiguousarray(target)
+
+    pred = pred.astype(np.float32)
+    target = target.astype(np.float32)
+
+    loss = ctypes.c_float()
+
+    if _lib.dain_mse(pred, target, ctypes.byref(loss), pred.size) != 0:
+        raise RuntimeError("Operation failed")
+
+    return loss.value
+
+
+def mse_grad(pred: np.ndarray, target: np.ndarray) -> np.ndarray:
+    """Compute gradient of MSE loss with respect to predictions.
+
+    Args:
+        pred: Predicted values
+        target: Target values
+
+    Returns:
+        Gradient of MSE with respect to predictions
+    """
+    if pred.shape != target.shape:
+        raise ValueError("Arrays must have the same shape")
+
+    if not pred.flags["C_CONTIGUOUS"]:
+        pred = np.ascontiguousarray(pred)
+    if not target.flags["C_CONTIGUOUS"]:
+        target = np.ascontiguousarray(target)
+
+    pred = pred.astype(np.float32)
+    target = target.astype(np.float32)
+    grad = np.empty_like(pred)
+
+    if _lib.dain_mse_grad(pred, target, grad, pred.size) != 0:
+        raise RuntimeError("Operation failed")
+
+    return grad
+
+
 def relu(x: np.ndarray) -> np.ndarray:
     """Apply ReLU activation function element-wise.
 
@@ -125,7 +195,6 @@ def relu(x: np.ndarray) -> np.ndarray:
     if not isinstance(x, np.ndarray):
         raise TypeError("Input must be a numpy array")
 
-    # Ensure contiguous array
     if not x.flags["C_CONTIGUOUS"]:
         x = np.ascontiguousarray(x)
 
@@ -154,7 +223,6 @@ def relu_grad(x: np.ndarray, grad_in: np.ndarray) -> np.ndarray:
     if x.shape != grad_in.shape:
         raise ValueError("Arrays must have the same shape")
 
-    # Ensure contiguous arrays
     if not x.flags["C_CONTIGUOUS"]:
         x = np.ascontiguousarray(x)
     if not grad_in.flags["C_CONTIGUOUS"]:

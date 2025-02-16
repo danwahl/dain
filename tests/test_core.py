@@ -1,7 +1,7 @@
 import numpy as np
 import pytest
 
-from dain import add, matmul, relu, relu_grad
+from dain import add, matmul, mse, mse_grad, relu, relu_grad
 
 
 def test_add_basic():
@@ -103,6 +103,99 @@ def test_matmul_non_contiguous():
     assert not a_non_contig.flags["C_CONTIGUOUS"]
     result = matmul(a_non_contig, b)
     expected = np.array([[58.0, 64.0], [139.0, 154.0]], dtype=np.float32)
+    np.testing.assert_array_almost_equal(result, expected)
+
+
+def test_mse_basic():
+    """Test basic MSE computation."""
+    pred = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    target = np.array([2.0, 2.0, 4.0], dtype=np.float32)
+    result = mse(pred, target)
+    expected = 2.0 / 3.0
+    np.testing.assert_almost_equal(result, expected, decimal=6)
+
+
+def test_mse_2d():
+    """Test 2D array MSE."""
+    pred = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    target = np.array([[1.0, 3.0], [3.0, 3.0]], dtype=np.float32)
+    result = mse(pred, target)
+    expected = 0.5
+    np.testing.assert_almost_equal(result, expected, decimal=6)
+
+
+def test_mse_zero():
+    """Test MSE when prediction equals target."""
+    pred = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    result = mse(pred, pred)
+    np.testing.assert_almost_equal(result, 0.0, decimal=6)
+
+
+def test_mse_shape_mismatch():
+    """Test error when array shapes don't match."""
+    pred = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    target = np.array([1.0, 2.0], dtype=np.float32)
+    with pytest.raises(ValueError, match="Arrays must have the same shape"):
+        mse(pred, target)
+
+
+def test_mse_non_contiguous():
+    """Test with non-contiguous arrays."""
+    pred = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    target = np.array([[1.0, 3.0], [3.0, 3.0]], dtype=np.float32)
+    pred_non_contig = pred.T.copy().T
+    target_non_contig = target.T.copy().T
+    assert not pred_non_contig.flags["C_CONTIGUOUS"]
+    assert not target_non_contig.flags["C_CONTIGUOUS"]
+    result = mse(pred_non_contig, target_non_contig)
+    expected = 0.5
+    np.testing.assert_almost_equal(result, expected, decimal=6)
+
+
+def test_mse_grad_basic():
+    """Test basic MSE gradient computation."""
+    pred = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    target = np.array([2.0, 2.0, 4.0], dtype=np.float32)
+    result = mse_grad(pred, target)
+    expected = np.array([-2 / 3, 0.0, -2 / 3], dtype=np.float32)
+    np.testing.assert_array_almost_equal(result, expected)
+
+
+def test_mse_grad_2d():
+    """Test 2D array MSE gradient."""
+    pred = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    target = np.array([[1.0, 3.0], [3.0, 3.0]], dtype=np.float32)
+    result = mse_grad(pred, target)
+    expected = np.array([[0.0, -0.5], [0.0, 0.5]], dtype=np.float32)
+    np.testing.assert_array_almost_equal(result, expected)
+
+
+def test_mse_grad_zero():
+    """Test MSE gradient when prediction equals target."""
+    pred = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    result = mse_grad(pred, pred)
+    expected = np.zeros_like(pred)
+    np.testing.assert_array_almost_equal(result, expected)
+
+
+def test_mse_grad_error_shape_mismatch():
+    """Test error when array shapes don't match."""
+    pred = np.array([1.0, 2.0, 3.0], dtype=np.float32)
+    target = np.array([1.0, 2.0], dtype=np.float32)
+    with pytest.raises(ValueError, match="Arrays must have the same shape"):
+        mse_grad(pred, target)
+
+
+def test_mse_grad_non_contiguous():
+    """Test with non-contiguous arrays."""
+    pred = np.array([[1.0, 2.0], [3.0, 4.0]], dtype=np.float32)
+    target = np.array([[1.0, 3.0], [3.0, 3.0]], dtype=np.float32)
+    pred_non_contig = pred.T.copy().T
+    target_non_contig = target.T.copy().T
+    assert not pred_non_contig.flags["C_CONTIGUOUS"]
+    assert not target_non_contig.flags["C_CONTIGUOUS"]
+    result = mse_grad(pred_non_contig, target_non_contig)
+    expected = np.array([[0.0, -0.5], [0.0, 0.5]], dtype=np.float32)
     np.testing.assert_array_almost_equal(result, expected)
 
 
