@@ -2,17 +2,20 @@
 
 A minimalist Python CUDA library.
 
+[![View on GitHub](https://img.shields.io/badge/View%20on-GitHub-blue)](https://github.com/danwahl/dain)
+[![Documentation](https://img.shields.io/badge/View-Documentation-green)](https://danwahl.github.io/dain/)
+
 ## Features
 
 - CUDA-accelerated neural network operations
 - Clean Python interface with NumPy integration
 - Core operations:
-  - Matrix multiplication
-  - Element-wise addition (with broadcasting)
-  - ReLU activation
-  - MSE loss
+    - Matrix multiplication
+    - Element-wise addition (with broadcasting)
+    - ReLU activation
+    - MSE loss
 - Example implementations:
-  - XOR neural network
+    - XOR neural network
 
 ## Requirements
 
@@ -58,41 +61,13 @@ bias = np.zeros((1, 4))       # Broadcasted bias
 output = add(d, bias)         # Add bias with broadcasting
 ```
 
-### Neural Network Example
+### Examples
 
 See `examples/xor.py` for a complete neural network implementation that learns the XOR function:
 
 ```bash
 python examples/xor.py
 ```
-
-## API Reference
-
-### Core Operations
-
-- `matmul(a: np.ndarray, b: np.ndarray) -> np.ndarray`
-  - Matrix multiplication
-  - Shapes: (M,K) @ (K,N) -> (M,N)
-
-- `add(a: np.ndarray, b: np.ndarray) -> np.ndarray`
-  - Element-wise addition with broadcasting
-  - Supports (M,N) + (1,N) broadcasting
-
-- `relu(x: np.ndarray) -> np.ndarray`
-  - ReLU activation function
-  - Element-wise max(0,x)
-
-- `mse(pred: np.ndarray, target: np.ndarray) -> float`
-  - Mean squared error loss
-  - Returns scalar loss value
-
-### Gradient Operations
-
-- `relu_grad(x: np.ndarray, grad_in: np.ndarray) -> np.ndarray`
-  - ReLU gradient for backpropagation
-
-- `mse_grad(pred: np.ndarray, target: np.ndarray) -> np.ndarray`
-  - MSE loss gradient for backpropagation
 
 ## License
 
