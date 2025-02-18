@@ -19,11 +19,17 @@ A minimalist Python CUDA library.
 
 ## Requirements
 
-- CUDA Toolkit
+- CUDA Toolkit 11.0+
 - Python 3.8+
 - NumPy
 
 ## Installation
+
+You can install `dain` directly from PyPI:
+
+```bash
+pip install dain
+```
 
 ### From Source
 
